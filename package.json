@@ -1,0 +1,32 @@
+{
+  "name": "hmve",
+  "version": "1.0.0",
+  "description": "Handle mongoose validation error",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "lodash": "^4.17.11"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoangtd97/hmve.git"
+  },
+  "keywords": [
+    "handle",
+    "mongoose",
+    "validation",
+    "error"
+  ],
+  "author": "Trần Đình Hoàng",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hoangtd97/hmve/issues"
+  },
+  "homepage": "https://github.com/hoangtd97/hmve#readme"
+}

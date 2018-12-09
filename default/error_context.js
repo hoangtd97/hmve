@@ -1,38 +1,41 @@
 module.exports = {
-  // <error_kind> : <context>
+  // <error_kind> : { <context_field> : <mongoose_error_field> }
   base            : {
-    kind          : 'kind',
-    path_name     : '$name',
-    path          : 'path',
+    KIND          : 'kind',
+    PATH_NAME     : 'path_name',
+    PATH          : 'path',
   },
   type            : {
-    type          : 'type',
-    type_name     : 'type_name',
-    value         : 'value',
-    stringValue   : 'stringValue'
+    TYPE          : 'type',
+    TYPE_NAME     : 'type_name',
+    VALUE         : 'value',
+    STRING_VALUE  : 'stringValue'
   },
   min             : {
-    value         : 'value',
-    min           : 'properties.min',
+    VALUE         : 'value',
+    MIN           : 'properties.min',
   },
   max             : {
-    value         : 'value',
-    max           : 'properties.max',
+    VALUE         : 'value',
+    MAX           : 'properties.max',
   },
   minlength       : {
-    value         : 'value',
-    min_length    : 'properties.minlength',
+    VALUE         : 'value',
+    MIN_LENGTH    : 'properties.minlength',
   },
   maxlength       : {
-    value         : 'value',
-    max_length    : 'properties.maxlength',
+    VALUE         : 'value',
+    MAX_LENGTH    : 'properties.maxlength',
   },
   regexp          : {
-    value         : 'value',
+    VALUE         : 'value',
   },
   enum            : {
-    value              : 'value',
-    enum_values        : 'properties.enumValues',
-    enum_values_string : 'properties.enumValuesString',
+    VALUE              : 'value',
+    ENUM_VALUES        : 'properties.enumValues',
+    STRING_ENUM_VALUES : 'properties.stringEnumValues',
+  },
+  validate        : {
+    VALUE         : 'value',
   }
 };

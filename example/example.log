@@ -1,0 +1,47 @@
+(node:8840) DeprecationWarning: current URL string parser is deprecated, and will be removed in a future version. To use the new parser, pass option { useNewUrlParser: true } to MongoClient.connect.
+MongoDB connected.
+Birthday must be a date, Username is required, FullName must be at least 3 characters long
+{
+  "model_name": "Users",
+  "pack": "DEFAULT",
+  "errors": [
+    {
+      "message": "Birthday must be a date",
+      "context": {
+        "KIND": "type",
+        "PATH_NAME": "birthday",
+        "PATH": "birthday",
+        "TYPE": "Date",
+        "TYPE_NAME": "date",
+        "VALUE": "is a date?",
+        "STRING_VALUE": "\"is a date?\""
+      },
+      "template": "{PATH_NAME} must be a {TYPE_NAME}"
+    },
+    {
+      "message": "Username is required",
+      "context": {
+        "KIND": "required",
+        "PATH_NAME": "username",
+        "PATH": "username"
+      },
+      "template": "{PATH_NAME} is required"
+    },
+    {
+      "message": "FullName must be at least 3 characters long",
+      "context": {
+        "KIND": "minlength",
+        "PATH_NAME": "fullName",
+        "PATH": "fullName",
+        "VALUE": "Bi",
+        "MIN_LENGTH": 3
+      },
+      "template": "{PATH_NAME} must be at least {MIN_LENGTH} characters long"
+    }
+  ],
+  "messages": [
+    "Birthday must be a date",
+    "Username is required",
+    "FullName must be at least 3 characters long"
+  ]
+}
