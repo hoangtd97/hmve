@@ -24,19 +24,27 @@ const TYPE_NAMES    = {}; // <pack>        : { <type> : <type_name> }
 const PATH_NAMES    = {}; // <model>       : { <pack> : { <path> : <name> } }
 const OPTIONS       = {};
 
+const ERROR_TYPE = {
+  MULTI       : 'multi',         // when validate or save
+  SINGLE      : 'single',        // when update
+  UNSUPPORTED : 'unsupported', 
+};
+
 //------------------- EXECUTOR -------------------
 
 /**
  * Handle mongoose validation error
  * @function hmve
- * @param {Object|String} model Mongoose model object or name
+ * @param {Object} model Mongoose model object or name
  * @param {Object} validationError Mongoose validation error
  * @param {String} [pack] package name, default is options.default_package
  * 
  * @return {Object} user-friendly error
  * 
  * @example
- * let UsersSchema = new Schema({
+ * const hmve = require('hmve');
+ * 
+ * const UsersSchema = new Schema({
  *   username : { type : String, required : true                                  },
  *   fullName : { type : String, required : false, minlength : 3, maxlength : 100 },
  *   birthday : { type : Date  , required : false                                 },
@@ -106,11 +114,12 @@ const OPTIONS       = {};
  * 
  */
 function handleMongooseValidateError(model, validationError, pack) {
-  [model, validationError, pack] = parseArguments(model, validationError, pack);
+  let error_type;
+  [model, validationError, pack, error_type] = parseArguments(model, validationError, pack);
   const originError = _is.filledString(OPTIONS.link_to_origin_error) ? _.cloneDeep(validationError) : undefined;
   const new_errors = [];
 
-  if (_.isObjectLike(validationError.errors)) {
+  if (error_type === ERROR_TYPE.MULTI) {
     for (let path in validationError.errors) {
       let line_error            = validationError.errors[path];
       const new_line_error      = generateLineError(model, line_error, pack);
@@ -118,11 +127,17 @@ function handleMongooseValidateError(model, validationError, pack) {
     }
   }
 
+  if (error_type === ERROR_TYPE.SINGLE) {
+    let line_error            = validationError;
+    const new_line_error      = generateLineError(model, line_error, pack);
+    new_errors.push(new_line_error);
+  }
+
   let messages     = new_errors.map(new_error => new_error.message);
   let message      = messages.join(OPTIONS.msg_delimiter);
 
   let error        = new Error(message);
-  error.model_name = model.name;
+  error.model_name = model.modelName;
   error.pack       = pack;
   error.errors     = new_errors;
   error.messages   = messages;
@@ -134,15 +149,41 @@ function handleMongooseValidateError(model, validationError, pack) {
   return error;
 }
 
+function parseArguments(...args) {
+  let [model, validationError, pack] = args;
+  if (!isMongooseModel(model)) {
+    throw new TypeError(`Parameter 'model' expect a mongoose model, but received '${model}'`);
+  }
+
+  let error_type = ERROR_TYPE.UNSUPPORTED;
+  if (isMultiValidationError(validationError)) {
+    error_type = ERROR_TYPE.MULTI;
+  }
+  if (isSingleValidationError(validationError)) {
+    error_type = ERROR_TYPE.SINGLE;
+  }
+  if (error_type === ERROR_TYPE.UNSUPPORTED) {
+    throw validationError;
+  }
+  
+  if (!_is.filledString(pack)) {
+    pack = OPTIONS.default_package;
+  }
+  return [model, validationError, pack, error_type];
+}
+
 /**
  * Validate mongoose document, handle error with hmve
  * @function validate
  * @param {Object} doc mongoose document
- * @param {String} pack package name, default is options.default_package
+ * @param {String} [pack] package name, default is options.default_package
+ * 
  * @return {object} user-friendly error
  * 
  * @example
- * let UsersSchema = new Schema({
+ * const hmve = require('hmve');
+ * 
+ * const UsersSchema = new Schema({
  *   username : { type : String, required : true                                  },
  *   fullName : { type : String, required : false, minlength : 3, maxlength : 100 },
  *   birthday : { type : Date  , required : false                                 },
@@ -178,20 +219,6 @@ function validateDocument(doc, pack) {
   });
 }
 
-function parseArguments(...args) {
-  let [model, validationError, pack] = args;
-  if (!isMongooseModel(model)) {
-    throw new TypeError(`Parameter 'model' expect a mongoose model, but received '${model}'`);
-  }
-  if (typeof validationError !== 'object' || validationError.name !== "ValidationError") {
-    throw validationError;
-  }
-  if (!_is.filledString(pack)) {
-    pack = OPTIONS.default_package;
-  }
-  return [model, validationError, pack];
-}
-
 function isMongooseModel(val) {
   if (!_.isObject(val) || typeof val.schema !== 'object') {
     return false;
@@ -205,6 +232,18 @@ function isMongooseModel(val) {
     return false;
   }
   return true;
+}
+
+function isMultiValidationError(error) {
+  return typeof error === 'object' 
+  && error.name === "ValidationError" 
+  && _is.filledObject(error.errors);
+}
+
+function isSingleValidationError(error) {
+  return typeof error === 'object' 
+  && _is.filledObject(error, ['name', 'path', 'kind'])
+  && !_is.filledObject(error.errors);
 }
 
 function generateLineError(model, line_error, pack) {
@@ -342,7 +381,7 @@ function setErrorContexts(errorKind, context) {
 /**
  * Set type names for a package
  * @param {String} packageName Package name, ex: 'en', 'vi', 'jp'
- * @param {Object} type names { <type> : <type_name> }
+ * @param {Object} typeNames  { <type> : <type_name> }
  * 
  * @see getTypeNames('DEFAULT') to view default type names
  * @example

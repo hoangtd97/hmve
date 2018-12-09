@@ -1,22 +1,37 @@
 # HMVE
 Handle mongoose validation error with custom and localize messages
 
+## API LIST
+
+| API | Description |
+| --- | --- |
+|<a href="#hmve">hmve(model, validationError, [pack])</a>|<p>Handle mongoose validation error</p>|
+|<a href="#validate">validate(doc, [pack])</a>|<p>Validate mongoose document, handle error with hmve</p>|
+|<a href="#setMessageTemplates">setMessageTemplates(packageName, messageTemplate)</a>|<p>Set message template for a package</p>|
+|<a href="#setTypeNames">setTypeNames(packageName, typeNames)</a>|<p>Set type names for a package</p>|
+|<a href="#setPathNames">setPathNames(model, packageName, pathNames)</a>|<p>Set path names for a package</p>|
+|<a href="#setOptions">setOptions(options)</a>|<p>set options</p>|
+
 # Handler
+<a id="hmve"></a>
 
 ## hmve(model, validationError, [pack]) ⇒ <code>Object</code>
 Handle mongoose validation error
 
+**Kind**: global function  
 **Returns**: <code>Object</code> - user-friendly error  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| model | <code>Object</code> \| <code>String</code> | Mongoose model object or name |
+| model | <code>Object</code> | Mongoose model object or name |
 | validationError | <code>Object</code> | Mongoose validation error |
 | [pack] | <code>String</code> | package name, default is options.default_package |
 
 **Example**  
 ```js
-let UsersSchema = new Schema({
+const hmve = require('hmve');
+
+const UsersSchema = new Schema({
   username : { type : String, required : true                                  },
   fullName : { type : String, required : false, minlength : 3, maxlength : 100 },
   birthday : { type : Date  , required : false                                 },
@@ -35,71 +50,73 @@ user.validate(err => {
      res.status(422).json(user_friendly_error.message); 
   }
 });
-```
 
-user_friendly_error look like :
-```json
+
+// user_friendly_error look like :
 {
-   "message"    : "Birthday must be a date, Username is required, FullName must be at least 3 characters long",
-   "messages"   : [
+   "message" : "Birthday must be a date, Username is required, FullName must be at least 3 characters long",
+   "messages": [
      "Birthday must be a date",
      "Username is required",
      "FullName must be at least 3 characters long"
-   ],
-   "model_name" : "Users",
-   "pack"       : "DEFAULT",
-   "errors"     : [
+   ]
+   "model_name": "Users",
+   "pack": "DEFAULT",
+   "errors": [
      {
-       "message"        : "Birthday must be a date",
-       "context"        : {
-         "KIND"         : "type",
-         "PATH_NAME"    : "birthday",
-         "PATH"         : "birthday",
-         "TYPE"         : "Date",
-         "TYPE_NAME"    : "date",
-         "VALUE"        : "is a date?",
-         "STRING_VALUE" : "\"is a date?\""
+       "message": "Birthday must be a date",
+       "context": {
+         "KIND": "type",
+         "PATH_NAME": "birthday",
+         "PATH": "birthday",
+         "TYPE": "Date",
+         "TYPE_NAME": "date",
+         "VALUE": "is a date?",
+         "STRING_VALUE": "\"is a date?\""
        },
-       "template"       : "{PATH_NAME} must be a {TYPE_NAME}"
+       "template": "{PATH_NAME} must be a {TYPE_NAME}"
      },
      {
-       "message"        : "Username is required",
-       "context"        : {
-         "KIND"         : "required",
-         "PATH_NAME"    : "username",
-         "PATH"         : "username"
+       "message": "Username is required",
+       "context": {
+         "KIND": "required",
+         "PATH_NAME": "username",
+         "PATH": "username"
        },
-       "template"       : "{PATH_NAME} is required"
+       "template": "{PATH_NAME} is required"
      },
      {
-       "message"        : "FullName must be at least 3 characters long",
-       "context"        : {
-         "KIND"         : "minlength",
-         "PATH_NAME"    : "fullName",
-         "PATH"         : "fullName",
-         "VALUE"        : "Bi",
-         "MIN_LENGTH"   : 3
+       "message": "FullName must be at least 3 characters long",
+       "context": {
+         "KIND": "minlength",
+         "PATH_NAME": "fullName",
+         "PATH": "fullName",
+         "VALUE": "Bi",
+         "MIN_LENGTH": 3
        },
-       "template"       : "{PATH_NAME} must be at least {MIN_LENGTH} characters long"
+       "template": "{PATH_NAME} must be at least {MIN_LENGTH} characters long"
      }
    ],
 }
 ```
-<a name="validate"></a>
+<a id="validate"></a>
 
-## validate(doc, pack) ⇒ <code>object</code>
+## validate(doc, [pack]) ⇒ <code>object</code>
 Validate mongoose document, handle error with hmve
 
+**Kind**: global function  
 **Returns**: <code>object</code> - user-friendly error  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | doc | <code>Object</code> | mongoose document |
-| pack | <code>String</code> | package name, default is options.default_package |
+| [pack] | <code>String</code> | package name, default is options.default_package |
 
 **Example**  
 ```js
-let UsersSchema = new Schema({
+const hmve = require('hmve');
+
+const UsersSchema = new Schema({
   username : { type : String, required : true                                  },
   fullName : { type : String, required : false, minlength : 3, maxlength : 100 },
   birthday : { type : Date  , required : false                                 },
@@ -119,12 +136,12 @@ if (user_friendly_error) {
 ```
 
 # Setter
-
-<a name="setMessageTemplates"></a>
+<a id="setMessageTemplates"></a>
 
 ## setMessageTemplates(packageName, messageTemplate)
 Set message template for a package
 
+**Kind**: global function  
 **See**: getErrorContexts to view all message template variable  
 
 | Param | Type | Description |
@@ -146,17 +163,18 @@ hmve.setMessageTemplates('vi', {
   regex     : '{PATH_NAME} không hợp lệ',
 });
 ```
-<a name="setTypeNames"></a>
+<a id="setTypeNames"></a>
 
-## setTypeNames(packageName, type)
+## setTypeNames(packageName, typeNames)
 Set type names for a package
 
+**Kind**: global function  
 **See**: getTypeNames('DEFAULT') to view default type names  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | packageName | <code>String</code> | Package name, ex: 'en', 'vi', 'jp' |
-| type | <code>Object</code> | names { <type> : <type_name> } |
+| typeNames | <code>Object</code> | { <type> : <type_name> } |
 
 **Example**  
 ```js
@@ -169,11 +187,12 @@ hmve.setTypeNames('vi', {
   Object  : 'Đối tượng'
 });
 ```
-<a name="setPathNames"></a>
+<a id="setPathNames"></a>
 
 ## setPathNames(model, packageName, pathNames)
 Set path names for a package
 
+**Kind**: global function  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -192,11 +211,12 @@ hmve.setPathNames('User', 'vi', {
    }
 });
 ```
-<a name="setOptions"></a>
+<a id="setOptions"></a>
 
 ## setOptions(options)
 set options
 
+**Kind**: global function  
 
 | Param | Type | Description |
 | --- | --- | --- |
