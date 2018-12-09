@@ -137,13 +137,17 @@ function handleMongooseValidateError(model, validationError, pack) {
   let message      = messages.join(OPTIONS.msg_delimiter);
 
   let error        = new Error(message);
+  error.messages   = messages;
   error.model_name = model.modelName;
   error.pack       = pack;
-  error.errors     = new_errors;
-  error.messages   = messages;
+  error.name       = validationError.name;
 
   if (originError) {
     error[OPTIONS.link_to_origin_error] = originError;
+  }
+
+  if (_is.filledString(OPTIONS.link_to_errors)) {
+    error[OPTIONS.link_to_errors] = new_errors;
   }
 
   return error;
@@ -226,7 +230,7 @@ function isMongooseModel(val) {
   let model_name = val.name;
   if (!_is.filledString(model_name)) {
     model_name = _.get(val, 'collection.name');
-    val.name = model_name;
+    val.modelName = model_name;
   };
   if (!model_name) {
     return false;
@@ -279,10 +283,10 @@ function generateErrMsgContext(model, err, pack) {
   if (err.kind === 'user defined') {
     err.kind = 'validate';
   }
-
+``
   err.path_name   = err.path;
   err.path_name   = _.get(schema.obj, [err.path, OPTIONS.path_name_key].join('.'), err.path_name);
-  err.path_name   = _.get(PATH_NAMES, [model.name, pack, err.path].join('.'), err.path_name);
+  err.path_name   = _.get(PATH_NAMES, [model.modelName, pack, err.path].join('.'), err.path_name);
 
   let base_context    = _.cloneDeep(ERR_CONTEXTS.base);
   for (let key in base_context) {
@@ -451,6 +455,7 @@ function setPathNames(model, packageName, pathNames) {
  *    default_package           : 'DEFAULT',
  *    msg_delimiter             : ', ',
  *    path_name_key             : '$name',
+ *    link_to_errors            : 'errors',
  *    link_to_origin_error      : false,
  *    additional_context_fields : {
  *      // <context_key> : <schema_key>
