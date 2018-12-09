@@ -1,8 +1,8 @@
 module.exports = {
-  Number  : 'number',
-  Boolean : 'boolean',
-  Date    : 'date',
-  String  : 'string',
-  Array   : 'array',
-  Object  : 'object'
+  number  : 'number',
+  boolean : 'boolean',
+  date    : 'date',
+  string  : 'string',
+  array   : 'array',
+  object  : 'object'
 };

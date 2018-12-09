@@ -268,7 +268,7 @@ function generateErrMsgContext(model, err, pack) {
   const schema        = model.schema;
 
   if (err.name === 'CastError') {
-    let type = err.kind;
+    let type = _.toLower(err.kind);
     err.kind = 'type';
     err.type = type;
     err.type_name = type;
