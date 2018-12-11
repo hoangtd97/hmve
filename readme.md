@@ -1,60 +1,128 @@
 # HMVE
 Handle mongoose validation error with custom and localize messages
 
-## API LIST
+## What ?
+---
+Mongoose has schema validation, but its error message isn't user-friendly, example :
+```js
+schema : fullName : { type : String, minlength : 3 }
+data   : fullName : 'Bi'
+```
+Will generate error  message : 
+```js
+Path `fullName` (`Bi`) is shorter than the minimum allowed length (3).
+```
 
-| API | Description |
-| --- | --- |
-|<a href="#hmve">hmve(model, validationError, [pack])</a>|<p>Handle mongoose validation error</p>|
-|<a href="#validate">validate(doc, [pack])</a>|<p>Validate mongoose document, handle error with hmve</p>|
-|<a href="#setMessageTemplates">setMessageTemplates(packageName, messageTemplate)</a>|<p>Set message template for a package</p>|
-|<a href="#setTypeNames">setTypeNames(packageName, typeNames)</a>|<p>Set type names for a package</p>|
-|<a href="#setPathNames">setPathNames(model, packageName, pathNames)</a>|<p>Set path names for a package</p>|
-|<a href="#setOptions">setOptions(options)</a>|<p>set options</p>|
+With hmve, you can custom error message, like :
+```
+Full name must be at least 3 characters long
+```
 
-# Handler
-<a id="hmve"></a>
+and localize :
+```
+(Vietnamese) Họ tên phải dài ít nhất 3 kí tự
+```
 
-## hmve(model, validationError, [pack]) ⇒ <code>Object</code>
-Handle mongoose validation error
-
-**Kind**: global function  
-**Returns**: <code>Object</code> - user-friendly error  
-
-| Param | Type | Description |
-| --- | --- | --- |
-| model | <code>Object</code> | Mongoose model object or name |
-| validationError | <code>Object</code> | Mongoose validation error |
-| [pack] | <code>String</code> | package name, default is options.default_package |
-
-**Example**  
+## How ?
+---
+* Custom error message templates  
+HMVE have configured default English message template, you can see it by call getMessageTemplates('DEFAULT'). If don't like, take your own :
 ```js
 const hmve = require('hmve');
 
-const UsersSchema = new Schema({
-  username : { type : String, required : true                                  },
-  fullName : { type : String, required : false, minlength : 3, maxlength : 100 },
-  birthday : { type : Date  , required : false                                 },
+hmve.setMessageTemplates('en', {
+  minlength : '{PATH_NAME} must be at least {MIN_LENGTH} characters long'
+  //...
 });
 
-const UsersModel = mongoose.model('Users', UsersSchema, 'Users');
-
-let user = UsersModel({
-  fullName : 'Bi',
-  birthday : 'is a date?',
+hmve.setMessageTemplates('vi', {
+  minlength : '{PATH_NAME} phải dài ít nhất {MIN_LENGTH} kí tự',
+  //...
 });
+```
 
-user.validate(err => {
-  user_friendly_error = hmve(UsersModel, err);
-  if (user_friendly_error) {
-     res.status(422).json(user_friendly_error.message); 
-  }
+* Custome type names 
+for not-English language
+```js
+hmve.setTypeNames('vi', {
+  number : 'số',
+  string : 'chuỗi',
+  //...
 });
+```
 
+* Custom path names  
+Schema paths are not always easy to read, especially for deep paths. 'Full name', 'country' are more readable then 'fullName', 'address.country', right ?
+You can custom path names in two way :
+  * Set directly in the schema with $name property, it apply to all language package
+  ```js
+  let UsersSchema = new Schema({
+    fullName : { type : String, minlength : 3, $name : 'full name' },
+    address : {
+      country : { type : String, $name : 'country' }
+    }
+  });
+  ```
+  * Use custom function, can set for each language package, and overwite $name
+  ```js
+  hmve.setPathNames('User', 'en', {
+    fullName : 'full name',
+    address  : {
+      country : 'country'
+    }
+  });
 
-// user_friendly_error look like :
+  hmve.setPathNames('User', 'vi', {
+    fullName : 'Họ tên'
+    address  : {
+      country : 'quốc gia'
+    }
+  });
+  ```
+
+* Generate user-friendly error  
+You can do this in two way :
+  * Wap mongoose validation error
+  ```js
+  let user = UsersModel({ fullName : 'Bi' );
+
+  user.validate(err => {
+    let en_user_friendly_error = hmve(UsersModel, err, 'en');
+    //=> en_user_friendly_error.message = 'Full name must be at least 3 characters long';
+    let vi_user_friendly_error = hmve(UsersModel, err, 'vi');
+    //=> vi_user_friendly_error.message = 'Họ tên phải dài ít nhất 3 kí tự';
+  });
+  ```
+
+  * Use hmve.validate() function
+  ```js
+  let user = UsersModel({ fullName : 'Bi' );
+
+  let en_user_friendly_error = await hmve.validate(user, 'en');
+  //=> en_user_friendly_error.message = 'Full name must be at least 3 characters long';
+  let vi_user_friendly_error = await hmve.validate(user, 'vi');
+  //=> vi_user_friendly_error.message = 'Họ tên phải dài ít nhất 3 kí tự';
+  ```
+
+## List Error kind (validator) and their context variables  
+Use this to write custom message templates
+
+| KIND | CONTEXT VARIABLE |
+|----- | ---------------- |
+| *    | PATH, PATH_NAME, VALUE |
+| type | TYPE, TYPE_NAME, STRING_VALUE |
+| min  | MIN |
+| max  | MAX |
+| minlength | MIN_LENGTH |
+| maxlength | MAX_LENGTH |
+| regexp    |  |
+| enum      | ENUM_VALUES, STRING_ENUM_VALUES |
+| validate  |  |
+
+## Error Object
+```js
 {
-   "message" : "Birthday must be a date, Username is required, FullName must be at least 3 characters long",
+   "message" : "Birthday must be a date, Username is required, Full name must be at least 3 characters long",
    "messages": [
      "Birthday must be a date",
      "Username is required",
@@ -86,10 +154,10 @@ user.validate(err => {
        "template": "{PATH_NAME} is required"
      },
      {
-       "message": "FullName must be at least 3 characters long",
+       "message": "Full name must be at least 3 characters long",
        "context": {
          "KIND": "minlength",
-         "PATH_NAME": "fullName",
+         "PATH_NAME": "full name",
          "PATH": "fullName",
          "VALUE": "Bi",
          "MIN_LENGTH": 3
@@ -99,12 +167,62 @@ user.validate(err => {
    ],
 }
 ```
+
+## API LIST
+
+| API | Description |
+| --- | --- |
+|<a href="#hmve">hmve(model, validationError, [pack])</a>|<p>Handle mongoose validation error</p>|
+|<a href="#validate">validate(doc, [pack])</a>|<p>Validate mongoose document, handle error with hmve</p>|
+|<a href="#setMessageTemplates">setMessageTemplates(packageName, messageTemplate)</a>|<p>Set message template for a package</p>|
+|<a href="#setTypeNames">setTypeNames(packageName, typeNames)</a>|<p>Set type names for a package</p>|
+|<a href="#setPathNames">setPathNames(model, packageName, pathNames)</a>|<p>Set path names for a package</p>|
+|<a href="#setOptions">setOptions(options)</a>|<p>set options</p>|
+
+# Handler
+<a id="hmve"></a>
+
+## hmve(model, validationError, [pack]) ⇒ <code>Object</code>
+Handle mongoose validation error, other error types will throw immediately.
+ 
+**Returns**: <code>Object</code> - user-friendly error  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| model | <code>Object</code> | Mongoose model object or name |
+| validationError | <code>Object</code> | Mongoose validation error |
+| [pack] | <code>String</code> | package name, default is options.default_package |
+
+**Example**  
+```js
+const hmve = require('hmve');
+
+const UsersSchema = new Schema({
+  username : { type : String, required : true                                  },
+  fullName : { type : String, required : false, minlength : 3, maxlength : 100 },
+  birthday : { type : Date  , required : false                                 },
+});
+
+const UsersModel = mongoose.model('Users', UsersSchema, 'Users');
+
+let user = UsersModel({
+  fullName : 'Bi',
+  birthday : 'is a date?',
+});
+
+user.validate(err => {
+  user_friendly_error = hmve(UsersModel, err);
+  if (user_friendly_error) {
+     res.status(422).json(user_friendly_error.message); 
+  }
+});
+```
+
 <a id="validate"></a>
 
 ## validate(doc, [pack]) ⇒ <code>object</code>
 Validate mongoose document, handle error with hmve
-
-**Kind**: global function  
+ 
 **Returns**: <code>object</code> - user-friendly error  
 
 | Param | Type | Description |
@@ -140,8 +258,7 @@ if (user_friendly_error) {
 
 ## setMessageTemplates(packageName, messageTemplate)
 Set message template for a package
-
-**Kind**: global function  
+ 
 **See**: getErrorContexts to view all message template variable  
 
 | Param | Type | Description |
@@ -167,8 +284,7 @@ hmve.setMessageTemplates('vi', {
 
 ## setTypeNames(packageName, typeNames)
 Set type names for a package
-
-**Kind**: global function  
+ 
 **See**: getTypeNames('DEFAULT') to view default type names  
 
 | Param | Type | Description |
@@ -191,8 +307,7 @@ hmve.setTypeNames('vi', {
 
 ## setPathNames(model, packageName, pathNames)
 Set path names for a package
-
-**Kind**: global function  
+ 
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -215,8 +330,7 @@ hmve.setPathNames('User', 'vi', {
 
 ## setOptions(options)
 set options
-
-**Kind**: global function  
+ 
 
 | Param | Type | Description |
 | --- | --- | --- |
