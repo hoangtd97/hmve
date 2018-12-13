@@ -25,9 +25,9 @@ and localize :
 
 ## Config
 Let's view simple config file, for :
-* [Single language - English](simple_config/hmve-config-multi-language.js)
-* [Single language - not English](simple_config/hmve-config-single-language-en.js)
-* [Multi language](simple_config)
+* [Single language - English](simple_config/hmve-config-single-language-en.js)
+* [Single language - not English](simple_config/hmve-config-single-language-not-en.js)
+* [Multi language](simple_config/hmve-config-multi-language.js)
 
 ## Use
 
