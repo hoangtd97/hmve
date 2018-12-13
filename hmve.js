@@ -1,7 +1,9 @@
 'use strict';
 
-const _                 = require('lodash');
-const _is               = require('./util/is');
+const _        = require('lodash');
+const _is      = require('./util/is');
+const CONST    = require('./const');
+const template = require('./util/template');
 
 module.exports                     = handleMongooseValidateError;
 module.exports.validate            = validateDocument;
@@ -24,12 +26,6 @@ const TYPE_NAMES    = {}; // <pack>        : { <type> : <type_name> }
 const PATH_NAMES    = {}; // <model>       : { <pack> : { <path> : <name> } }
 const OPTIONS       = {};
 
-const ERROR_TYPE = {
-  MULTI       : 'multi',         // when validate or save
-  SINGLE      : 'single',        // when update
-  UNSUPPORTED : 'unsupported', 
-};
-
 //------------------- EXECUTOR -------------------
 
 /**
@@ -37,7 +33,7 @@ const ERROR_TYPE = {
  * @function hmve
  * @param {Object} model Mongoose model object or name
  * @param {Object} validationError Mongoose validation error
- * @param {String} [pack] package name, default is options.default_package
+ * @param {Object} [options]
  * 
  * @return {Object} user-friendly error
  * 
@@ -60,77 +56,38 @@ const ERROR_TYPE = {
  * user.validate(err => {
  *   user_friendly_error = hmve(UsersModel, err);
  *   if (user_friendly_error) {
- *      res.status(422).json(user_friendly_error.message); 
+ *      res.status(401).json(user_friendly_error.message); 
  *   }
  * });
  * 
- * 
- * // user_friendly_error look like :
- * {
- *    "message" : "Birthday must be a date, Username is required, FullName must be at least 3 characters long",
- *    "messages": [
- *      "Birthday must be a date",
- *      "Username is required",
- *      "FullName must be at least 3 characters long"
- *    ]
- *    "model_name": "Users",
- *    "pack": "DEFAULT",
- *    "errors": [
- *      {
- *        "message": "Birthday must be a date",
- *        "context": {
- *          "KIND": "type",
- *          "PATH_NAME": "birthday",
- *          "PATH": "birthday",
- *          "TYPE": "Date",
- *          "TYPE_NAME": "date",
- *          "VALUE": "is a date?",
- *          "STRING_VALUE": "\"is a date?\""
- *        },
- *        "template": "{PATH_NAME} must be a {TYPE_NAME}"
- *      },
- *      {
- *        "message": "Username is required",
- *        "context": {
- *          "KIND": "required",
- *          "PATH_NAME": "username",
- *          "PATH": "username"
- *        },
- *        "template": "{PATH_NAME} is required"
- *      },
- *      {
- *        "message": "FullName must be at least 3 characters long",
- *        "context": {
- *          "KIND": "minlength",
- *          "PATH_NAME": "fullName",
- *          "PATH": "fullName",
- *          "VALUE": "Bi",
- *          "MIN_LENGTH": 3
- *        },
- *        "template": "{PATH_NAME} must be at least {MIN_LENGTH} characters long"
- *      }
- *    ],
- * }
- * 
  */
-function handleMongooseValidateError(model, validationError, pack) {
+function handleMongooseValidateError(model, validationError, options) {
   let error_type;
-  [model, validationError, pack, error_type] = parseArguments(model, validationError, pack);
-  const originError = _is.filledString(OPTIONS.link_to_origin_error) ? _.cloneDeep(validationError) : undefined;
+  [model, validationError, options, error_type] = parseArguments(model, validationError, options);
   const new_errors = [];
 
-  if (error_type === ERROR_TYPE.MULTI) {
+  if (error_type === CONST.ERROR_TYPE.UNSUPPORTED) {
+    return validationError;
+  }
+
+  if (error_type === CONST.ERROR_TYPE.MULTI) {
     for (let path in validationError.errors) {
       let line_error            = validationError.errors[path];
-      const new_line_error      = generateLineError(model, line_error, pack);
-      new_errors.push(new_line_error);
+      const new_line_error      = generateLineError(model, line_error, options);
+      if (_is.filledObject(new_line_error)) {
+        new_errors.push(new_line_error);
+      }
     }
   }
 
-  if (error_type === ERROR_TYPE.SINGLE) {
+  if (error_type === CONST.ERROR_TYPE.SINGLE) {
     let line_error            = validationError;
-    const new_line_error      = generateLineError(model, line_error, pack);
+    const new_line_error      = generateLineError(model, line_error, options);
     new_errors.push(new_line_error);
+  }
+
+  if (new_errors.length <= 0) {
+    return undefined;
   }
 
   let messages     = new_errors.map(new_error => new_error.message);
@@ -139,12 +96,9 @@ function handleMongooseValidateError(model, validationError, pack) {
   let error        = new Error(message);
   error.messages   = messages;
   error.model_name = model.modelName;
-  error.pack       = pack;
-  error.name       = validationError.name;
+  error.options    = options;
 
-  if (originError) {
-    error[OPTIONS.link_to_origin_error] = originError;
-  }
+  _.merge(error, OPTIONS.additional_error_fields);
 
   if (_is.filledString(OPTIONS.link_to_errors)) {
     error[OPTIONS.link_to_errors] = new_errors;
@@ -154,33 +108,35 @@ function handleMongooseValidateError(model, validationError, pack) {
 }
 
 function parseArguments(...args) {
-  let [model, validationError, pack] = args;
-  if (!isMongooseModel(model)) {
+  const HANDLER_OPTIONS = {
+    package       : OPTIONS.default_package,
+    exclude_error : []
+  };
+
+  let [model, validationError, options] = args;
+  if (!_is.mongooseModel(model)) {
     throw new TypeError(`Parameter 'model' expect a mongoose model, but received '${model}'`);
   }
 
-  let error_type = ERROR_TYPE.UNSUPPORTED;
-  if (isMultiValidationError(validationError)) {
-    error_type = ERROR_TYPE.MULTI;
+  let error_type = CONST.ERROR_TYPE.UNSUPPORTED;
+  if (_is.multiValidationError(validationError)) {
+    error_type = CONST.ERROR_TYPE.MULTI;
   }
-  if (isSingleValidationError(validationError)) {
-    error_type = ERROR_TYPE.SINGLE;
+  if (_is.singleValidationError(validationError)) {
+    error_type = CONST.ERROR_TYPE.SINGLE;
   }
-  if (error_type === ERROR_TYPE.UNSUPPORTED) {
-    throw validationError;
-  }
-  
-  if (!_is.filledString(pack)) {
-    pack = OPTIONS.default_package;
-  }
-  return [model, validationError, pack, error_type];
+ 
+  options = _.assign(HANDLER_OPTIONS, options);
+
+  return [model, validationError, options, error_type];
 }
 
 /**
- * Validate mongoose document, handle error with hmve
+ * Validate mongoose document, handle error with hmve.
+ * This just a convenience syntax with async/await.
  * @function validate
  * @param {Object} doc mongoose document
- * @param {String} [pack] package name, default is options.default_package
+ * @param {Object} [options]
  * 
  * @return {object} user-friendly error
  * 
@@ -202,12 +158,12 @@ function parseArguments(...args) {
  * 
  * let user_friendly_error = await hmve.validate(user);
  * if (user_friendly_error) {
- *    res.status(422).json(user_friendly_error.message); 
+ *    res.status(401).json(user_friendly_error.message); 
  * }
  */
-function validateDocument(doc, pack) {
+function validateDocument(doc, options) {
   const model = Object.getPrototypeOf(doc);
-  if (typeof doc !== 'object' || !isMongooseModel(model)) {
+  if (typeof doc !== 'object' || !_is.mongooseModel(model)) {
     throw new TypeError(`Param 'doc' expect a mongoose document, but received '${doc}'`);
   }
 
@@ -217,48 +173,24 @@ function validateDocument(doc, pack) {
         return resolve();
       }
       
-      let new_error = handleMongooseValidateError(model, err, pack);
+      let new_error = handleMongooseValidateError(model, err, options);
       resolve(new_error);
     });
   });
 }
 
-function isMongooseModel(val) {
-  if (!_.isObject(val) || typeof val.schema !== 'object') {
-    return false;
+function generateLineError(model, line_error, options) {
+  let err_context  = generateErrMsgContext(model, line_error, options.package);
+  if (options.exclude_error.includes(err_context.KIND)) {
+    return undefined;
   }
-  let model_name = val.name;
-  if (!_is.filledString(model_name)) {
-    model_name = _.get(val, 'collection.name');
-    val.modelName = model_name;
-  };
-  if (!model_name) {
-    return false;
-  }
-  return true;
-}
-
-function isMultiValidationError(error) {
-  return typeof error === 'object' 
-  && error.name === "ValidationError" 
-  && _is.filledObject(error.errors);
-}
-
-function isSingleValidationError(error) {
-  return typeof error === 'object' 
-  && _is.filledObject(error, ['name', 'path', 'kind'])
-  && !_is.filledObject(error.errors);
-}
-
-function generateLineError(model, line_error, pack) {
-  let err_context  = generateErrMsgContext(model, line_error, pack);
-  let msg_template = _.get(MSG_TEMPLATES[pack], OPTIONS.default_key);
-  msg_template     = _.get(MSG_TEMPLATES[pack], line_error.kind, msg_template);
+  let msg_template = _.get(MSG_TEMPLATES[options.package], OPTIONS.default_key);
+  msg_template     = _.get(MSG_TEMPLATES[options.package], line_error.kind, msg_template);
   if (line_error.kind === 'user defined') {
     msg_template = line_error.message;
   }
   return {
-    message  : compile(msg_template, err_context),
+    message  : template.compile(msg_template, err_context),
     context  : err_context,
     template : msg_template
   }
@@ -308,35 +240,18 @@ function generateErrMsgContext(model, err, pack) {
   return context;
 }
 
-function compile(template,  data) {
-  let result = template.toString ? template.toString() : '';
-  result = result.replace(/{.+?}/g, function(matcher){
-    var path = matcher.slice(1, -1).trim();
-    return _.get(data, path, '');
-  });
-  if (result.length > 0) {
-    if (isLowerCase(result[0])) {
-      result = result[0].toUpperCase() + result.slice(1);
-    }
-  }
-  return result;
-}
-
-function isLowerCase(char) {
-  return char >= 'a' && char <= 'z';
-}
-
 //------------------- SETTER ---------------------
 
 /**
  * Set message template for a package
- * @param {String} packageName Package name, ex: 'en', 'vi', 'jp'
  * @param {Object} messageTemplate { <error_kind> : <message_template> }
+ * @param {String} [packageName] Package name, ex: 'en', 'vi', 'jp'
  * 
- * @see getErrorContexts to view all message template variable
+ * @see getMessageTemplates('DEFAULT') to view default message template
+ * 
  * @example
  * 
- * hmve.setMessageTemplates('vi', { 
+ * hmve.setMessageTemplates({ 
  *   DEFAULT   : '{PATH_NAME} không hợp lệ',
  *   type      : '{PATH_NAME} phải là {TYPE_NAME}',
  *   required  : 'Thiếu thông tin {PATH_NAME}',
@@ -346,14 +261,15 @@ function isLowerCase(char) {
  *   maxlength : '{PATH_NAME} không vượt quá {MAX_LENGTH} kí tự',
  *   enum      : '{PATH_NAME} phải thuộc một trong các giá trị sau : {STRING_ENUM_VALUES}',
  *   regex     : '{PATH_NAME} không hợp lệ',
- * });
+ *   unique    : '{PATH_NAME} {VALUE} đã được sử dụng, vui lòng chọn {PATH_NAME} khác',
+ * }, 'vi');
  */
-function setMessageTemplates(packageName, messageTemplate) {
-  if (!_is.filledString(packageName)) {
-    throw new TypeError(`Param 'packageName' expect a string, but received '${packageName}'`);
-  }
+function setMessageTemplates(messageTemplate, packageName) {
   if (!_is.filledObject(messageTemplate)) {
     throw new TypeError(`Param 'messageTemplate' expect a object, but received '${messageTemplate}'`);
+  }
+  if (!_is.filledString(packageName)) {
+    packageName = OPTIONS.default_package;
   }
   MSG_TEMPLATES[packageName] = messageTemplate;
 }
@@ -384,27 +300,28 @@ function setErrorContexts(errorKind, context) {
 
 /**
  * Set type names for a package
- * @param {String} packageName Package name, ex: 'en', 'vi', 'jp'
  * @param {Object} typeNames  { <type> : <type_name> }
+ * @param {String} [packageName] Package name, ex: 'en', 'vi', 'jp'
  * 
  * @see getTypeNames('DEFAULT') to view default type names
  * @example
  * 
- * hmve.setTypeNames('vi', { 
- *   Number  : 'số',
- *   Boolean : 'luận lý',
- *   Date    : 'ngày',
- *   String  : 'chuỗi',
- *   Array   : 'Mảng',
- *   Object  : 'Đối tượng'
- * });
+ * hmve.setTypeNames({ 
+ *   number  : 'số',
+ *   boolean : 'luận lý',
+ *   date    : 'ngày',
+ *   string  : 'chuỗi',
+ *   array   : 'mảng',
+ *   object  : 'đối tượng',
+ *   buffer  : 'bộ nhớ đệm',
+ * }, 'vi');
  */
-function setTypeNames(packageName, typeNames) {
-  if (!_is.filledString(packageName)) {
-    throw new TypeError(`Param 'packageName' expect a string, but received '${packageName}'`);
-  }
+function setTypeNames(typeNames, packageName) {
   if (!_is.filledObject(typeNames)) {
     throw new TypeError(`Param 'typeNames' expect a object, but received '${typeNames}'`);
+  }
+  if (!_is.filledString(packageName)) {
+    packageName = OPTIONS.default_package;
   }
   TYPE_NAMES[packageName] = typeNames;
 }
@@ -412,21 +329,21 @@ function setTypeNames(packageName, typeNames) {
 /**
  * Set path names for a package
  * @param {Object|String} model mongoose model or model name
- * @param {String} packageName package name, ex: 'en', 'vi'
  * @param {Object} pathNames { <path> : <path_name> }, which has the same structure as Mongoose Schema
+ * @param {String} [packageName] package name, ex: 'en', 'vi'
  * 
  * @example
  * 
- * hmve.setPathNames('User', 'vi', {
+ * hmve.setPathNames('User', {
  *    username : 'tên tài khoản',
  *    age      : 'tuổi',
  *    address  : {
  *      country : 'quốc gia',
  *      province : 'tỉnh thành'
  *    }
- * });
+ * }, 'vi');
  */
-function setPathNames(model, packageName, pathNames) {
+function setPathNames(model, pathNames, packageName) {
   let model_name = undefined;
   if (_is.filledString(model)) {
     model_name = model;
@@ -437,11 +354,11 @@ function setPathNames(model, packageName, pathNames) {
   if (!_is.filledString(model_name)) {
     throw new TypeError(`Param 'model' expect a string or object, but received '${model}'`);
   }
-  if (!_is.filledString(packageName)) {
-    throw new TypeError(`Param 'packageName' expect a string, but received '${packageName}'`);
-  }
   if (!_is.filledObject(pathNames)) {
     throw new TypeError(`Param 'pathNames' expect a object, but received '${pathNames}'`);
+  }
+  if (!_is.filledString(packageName)) {
+    packageName = OPTIONS.default_package;
   }
   _.set(PATH_NAMES, [model_name, packageName], pathNames);
 }
@@ -457,6 +374,10 @@ function setPathNames(model, packageName, pathNames) {
  *    path_name_key             : '$name',
  *    link_to_errors            : 'errors',
  *    link_to_origin_error      : false,
+ *    additional_error_fields   : {
+ *      error_name                : 'ValidationError',
+ *      error_code                : 'ERR_MONGOOSE_VALIDATION_ERROR',
+ *     },
  *    additional_context_fields : {
  *      // <context_key> : <schema_key>
  *    }

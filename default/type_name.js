@@ -4,5 +4,6 @@ module.exports = {
   date    : 'date',
   string  : 'string',
   array   : 'array',
-  object  : 'object'
+  object  : 'object',
+  buffer  : 'buffer'
 };

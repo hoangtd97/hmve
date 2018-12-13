@@ -4,7 +4,10 @@ module.exports = {
   msg_delimiter             : ', ',
   path_name_key             : '$name',
   link_to_errors            : 'errors',
-  link_to_origin_error      : false,
+  additional_error_fields   : {
+    name                : 'ValidationError',
+    code                : 'ERR_MONGOOSE_VALIDATION_ERROR',
+  },
   additional_context_fields : {
     // <context_key> : <schema_key>
   }

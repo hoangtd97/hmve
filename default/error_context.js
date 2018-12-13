@@ -37,5 +37,8 @@ module.exports = {
   },
   validate        : {
     VALUE         : 'value',
+  },
+  unique          : {
+    VALUE         : 'value',
   }
 };

@@ -7,5 +7,6 @@ module.exports = {
   minlength : '{PATH_NAME} must be at least {MIN_LENGTH} characters long',
   maxlength : '{PATH_NAME} must be at most {MAX_LENGTH} characters long',
   enum      : '{PATH_NAME} must be one of the following: {STRING_ENUM_VALUES}',
-  match     : 'Invalid {PATH_NAME}',
+  regex     : 'Invalid {PATH_NAME}',
+  unique    : '{PATH_NAME} {VALUE} have been used',
 };

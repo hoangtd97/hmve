@@ -1,12 +1,21 @@
 'use strict';
 
+const CONST    = require('../const');
+const _        = require('lodash');
+const parse    = require('./parse');
+
 module.exports = {
-  string       : isString,
-  filledString : isFilledString,
-  array        : isArray,
-  filledArray  : isFilledArray,
-  object       : isObject,
-  filledObject : isFilledObject,
+  string                : isString,
+  filledString          : isFilledString,
+  lowerCase             : isLowerCase,
+  array                 : isArray,
+  filledArray           : isFilledArray,
+  object                : isObject,
+  filledObject          : isFilledObject,
+  mongooseModel         : isMongooseModel,
+  multiValidationError  : isMultiValidationError,
+  singleValidationError : isSingleValidationError,
+  mongooseUniqueError   : isMongooseUniqueError
 };
 
 /////////////////////////////
@@ -30,6 +39,10 @@ function isFilledString(val, minLength = 1, maxLength = Number.MAX_SAFE_INTEGER)
     );
 }
 
+function isLowerCase(char) {
+  return char >= 'a' && char <= 'z';
+}
+
 function isArray(val) {
   return Array.isArray(val);
 }
@@ -46,10 +59,10 @@ function isObject(val) {
  * Check whether the value is an object have least one path,
  *  and [if paths provided] contain all path in paths
  * @example
- * _is.filledObject({ id : 1000 })                                => true
- * _is.filledObject('bibo')                                       => false
- * _is.filledObject({ id : 1000 }, ['id', 'name'])                => false
- * _is.filledObject({ id : 1000, name : 'bibo'}, ['id', 'name'])  => true
+ * isFilledObject({ id : 1000 })                                => true
+ * isFilledObject('bibo')                                       => false
+ * isFilledObject({ id : 1000 }, ['id', 'name'])                => false
+ * isFilledObject({ id : 1000, name : 'bibo'}, ['id', 'name'])  => true
  * @param {any} val - value want to check
  * @param {string|string[]} [paths] - path(s) that the object must contain all
  * 
@@ -68,4 +81,43 @@ function isFilledObject(val, paths) {
     }
   }
   return true;
+}
+
+//-------------------- MONGOOSE validator -------------------
+function isMongooseModel(val) {
+  if (isObject(val) || typeof val.schema !== 'object') {
+    return false;
+  }
+  let model_name = val.name;
+  if (isFilledString(model_name)) {
+    model_name = _.get(val, 'collection.name');
+    val.modelName = model_name;
+  };
+  if (!model_name) {
+    return false;
+  }
+  return true;
+}
+
+function isMultiValidationError(error) {
+  return typeof error === 'object' 
+  && error.name === "ValidationError" 
+  && isFilledObject(error.errors);
+}
+
+function isSingleValidationError(error) {
+  if (isFilledObject(error)) {
+    if (isMongooseUniqueError(error)) {
+      parse.uniqueError(error);
+    }
+    if (!isFilledObject(error.errors)
+    && isFilledObject(error, ['name', 'path', 'kind'])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isMongooseUniqueError(err) {
+  return err.name === 'MongoError' && err.code === 11000;
 }

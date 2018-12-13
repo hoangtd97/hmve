@@ -23,88 +23,63 @@ and localize :
 (Vietnamese) Họ tên phải dài ít nhất 3 kí tự
 ```
 
-## How ?
----
-* Custom error message templates  
-HMVE have configured default English message template, you can see it by call getMessageTemplates('DEFAULT'). If don't like, take your own :
-```js
-const hmve = require('hmve');
+## Config
+Let's view simple config file, for :
+* [Single language - English](simple_config/hmve-config-multi-language.js)
+* [Single language - not English](simple_config/hmve-config-single-language-en.js)
+* [Multi language](simple_config)
 
-hmve.setMessageTemplates('en', {
-  minlength : '{PATH_NAME} must be at least {MIN_LENGTH} characters long'
-  //...
-});
+## Use
 
-hmve.setMessageTemplates('vi', {
-  minlength : '{PATH_NAME} phải dài ít nhất {MIN_LENGTH} kí tự',
-  //...
-});
-```
-
-* Custome type names 
-for not-English language
-```js
-hmve.setTypeNames('vi', {
-  number : 'số',
-  string : 'chuỗi',
-  //...
-});
-```
-
-* Custom path names  
-Schema paths are not always easy to read, especially for deep paths. 'Full name', 'country' are more readable then 'fullName', 'address.country', right ?
-You can custom path names in two way :
-  * Set directly in the schema with $name property, it apply to all language package
+### Add path names
+* For single language, just add $name to mongoose Schema :
   ```js
-  let UsersSchema = new Schema({
-    fullName : { type : String, minlength : 3, $name : 'full name' },
-    address : {
-      country : { type : String, $name : 'country' }
-    }
-  });
+    username : { type : String, required : true, unique : true, $name : 'tên tài khoản' },
   ```
-  * Use custom function, can set for each language package, and overwite $name
-  ```js
-  hmve.setPathNames('User', 'en', {
-    fullName : 'full name',
-    address  : {
-      country : 'country'
-    }
-  });
+  If $name not specific, hmve will use path ('username') 
 
-  hmve.setPathNames('User', 'vi', {
-    fullName : 'Họ tên'
-    address  : {
-      country : 'quốc gia'
-    }
-  });
+* For multi language, use setPathNames() with language package name
+  ```js
+  hmve.setPathNames(UserModel, { username : 'tên tài khoản', address : { country : 'quốc gia' } }, 'vi');
+  hmve.setPathNames(UserModel, { username : 'ユーザー名'    , address : { country : '国'       } }, 'jpa');
   ```
 
-* Generate user-friendly error  
-You can do this in two way :
-  * Wap mongoose validation error
+### Handle error
+hmve only handle mongoose validation error, other error type will be return directly.
+  * on mongoose document validate()  
+  Cann't handle unique error.
   ```js
-  let user = UsersModel({ fullName : 'Bi' );
-
+  let user = UserModel({ username : 'boo' });
   user.validate(err => {
-    let en_user_friendly_error = hmve(UsersModel, err, 'en');
-    //=> en_user_friendly_error.message = 'Full name must be at least 3 characters long';
-    let vi_user_friendly_error = hmve(UsersModel, err, 'vi');
-    //=> vi_user_friendly_error.message = 'Họ tên phải dài ít nhất 3 kí tự';
+    err = hmve(UserModel, err);
+    if (err) {
+      // use can change error code by use setOptions()
+      if (err.code === 'ERR_MONGOOSE_VALIDATION_ERROR') { 
+        return res.status(401).json({ error : err.message });
+      }
+      return res.status(500).json({ error : `ERROR DB ${err.message}` });
+    }
   });
   ```
 
-  * Use hmve.validate() function
+  * on mongoose model write method like create(), findOneAndUpdate(), ...   
+  Can handle unique error.
   ```js
-  let user = UsersModel({ fullName : 'Bi' );
-
-  let en_user_friendly_error = await hmve.validate(user, 'en');
-  //=> en_user_friendly_error.message = 'Full name must be at least 3 characters long';
-  let vi_user_friendly_error = await hmve.validate(user, 'vi');
-  //=> vi_user_friendly_error.message = 'Họ tên phải dài ít nhất 3 kí tự';
+  UserModel
+    .create({ username : 'boo' })
+    .then(user => res.json(user))
+    .catch(err => {
+      err = hmve(UserModel, err);
+      if (err.code === 'ERR_MONGOOSE_VALIDATION_ERROR') { 
+        return res.status(401).json({ error : err.message });
+      }
+      return res.status(500).json({ error : `ERROR DB ${err.message}` });
+    });
   ```
 
-## List Error kind (validator) and their context variables  
+
+
+## List Error kind and their context variables  
 Use this to write custom message templates
 
 | KIND | CONTEXT VARIABLE |
@@ -118,6 +93,7 @@ Use this to write custom message templates
 | regexp    |  |
 | enum      | ENUM_VALUES, STRING_ENUM_VALUES |
 | validate  |  |
+| unique    |  |
 
 ## Error Object
 ```js
@@ -128,6 +104,8 @@ Use this to write custom message templates
      "Username is required",
      "FullName must be at least 3 characters long"
    ]
+   "name": "ValidationError",
+   "code": "ERR_MONGOOSE_VALIDATION_ERROR",
    "model_name": "Users",
    "pack": "DEFAULT",
    "errors": [
@@ -182,16 +160,16 @@ Use this to write custom message templates
 # Handler
 <a id="hmve"></a>
 
-## hmve(model, validationError, [pack]) ⇒ <code>Object</code>
-Handle mongoose validation error, other error types will throw immediately.
- 
+## hmve(model, validationError, [options]) ⇒ <code>Object</code>
+Handle mongoose validation error
+  
 **Returns**: <code>Object</code> - user-friendly error  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | model | <code>Object</code> | Mongoose model object or name |
 | validationError | <code>Object</code> | Mongoose validation error |
-| [pack] | <code>String</code> | package name, default is options.default_package |
+| [options] | <code>Object</code> |  |
 
 **Example**  
 ```js
@@ -213,22 +191,22 @@ let user = UsersModel({
 user.validate(err => {
   user_friendly_error = hmve(UsersModel, err);
   if (user_friendly_error) {
-     res.status(422).json(user_friendly_error.message); 
+     res.status(401).json(user_friendly_error.message); 
   }
 });
 ```
-
 <a id="validate"></a>
 
-## validate(doc, [pack]) ⇒ <code>object</code>
-Validate mongoose document, handle error with hmve
- 
+## validate(doc, [options]) ⇒ <code>object</code>
+Validate mongoose document, handle error with hmve.
+This just a convenience syntax with async/await.
+  
 **Returns**: <code>object</code> - user-friendly error  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | doc | <code>Object</code> | mongoose document |
-| [pack] | <code>String</code> | package name, default is options.default_package |
+| [options] | <code>Object</code> |  |
 
 **Example**  
 ```js
@@ -249,26 +227,26 @@ let user = UsersModel({
 
 let user_friendly_error = await hmve.validate(user);
 if (user_friendly_error) {
-   res.status(422).json(user_friendly_error.message); 
+   res.status(401).json(user_friendly_error.message); 
 }
 ```
-
-# Setter
 <a id="setMessageTemplates"></a>
 
-## setMessageTemplates(packageName, messageTemplate)
+# Setter
+
+## setMessageTemplates(messageTemplate, [packageName])
 Set message template for a package
- 
-**See**: getErrorContexts to view all message template variable  
+  
+**See**: getMessageTemplates('DEFAULT') to view default message template  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| packageName | <code>String</code> | Package name, ex: 'en', 'vi', 'jp' |
 | messageTemplate | <code>Object</code> | { <error_kind> : <message_template> } |
+| [packageName] | <code>String</code> | Package name, ex: 'en', 'vi', 'jp' |
 
 **Example**  
 ```js
-hmve.setMessageTemplates('vi', { 
+hmve.setMessageTemplates({ 
   DEFAULT   : '{PATH_NAME} không hợp lệ',
   type      : '{PATH_NAME} phải là {TYPE_NAME}',
   required  : 'Thiếu thông tin {PATH_NAME}',
@@ -278,59 +256,61 @@ hmve.setMessageTemplates('vi', {
   maxlength : '{PATH_NAME} không vượt quá {MAX_LENGTH} kí tự',
   enum      : '{PATH_NAME} phải thuộc một trong các giá trị sau : {STRING_ENUM_VALUES}',
   regex     : '{PATH_NAME} không hợp lệ',
-});
+  unique    : '{PATH_NAME} {VALUE} đã được sử dụng, vui lòng chọn {PATH_NAME} khác',
+}, 'vi');
 ```
 <a id="setTypeNames"></a>
 
-## setTypeNames(packageName, typeNames)
+## setTypeNames(typeNames, [packageName])
 Set type names for a package
- 
+  
 **See**: getTypeNames('DEFAULT') to view default type names  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| packageName | <code>String</code> | Package name, ex: 'en', 'vi', 'jp' |
 | typeNames | <code>Object</code> | { <type> : <type_name> } |
+| [packageName] | <code>String</code> | Package name, ex: 'en', 'vi', 'jp' |
 
 **Example**  
 ```js
-hmve.setTypeNames('vi', { 
-  Number  : 'số',
-  Boolean : 'luận lý',
-  Date    : 'ngày',
-  String  : 'chuỗi',
-  Array   : 'Mảng',
-  Object  : 'Đối tượng'
-});
+hmve.setTypeNames({ 
+  number  : 'số',
+  boolean : 'luận lý',
+  date    : 'ngày',
+  string  : 'chuỗi',
+  array   : 'mảng',
+  object  : 'đối tượng',
+  buffer  : 'bộ nhớ đệm',
+}, 'vi');
 ```
 <a id="setPathNames"></a>
 
-## setPathNames(model, packageName, pathNames)
+## setPathNames(model, pathNames, [packageName])
 Set path names for a package
- 
+  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | model | <code>Object</code> \| <code>String</code> | mongoose model or model name |
-| packageName | <code>String</code> | package name, ex: 'en', 'vi' |
 | pathNames | <code>Object</code> | { <path> : <path_name> }, which has the same structure as Mongoose Schema |
+| [packageName] | <code>String</code> | package name, ex: 'en', 'vi' |
 
 **Example**  
 ```js
-hmve.setPathNames('User', 'vi', {
+hmve.setPathNames('User', {
    username : 'tên tài khoản',
    age      : 'tuổi',
    address  : {
      country : 'quốc gia',
      province : 'tỉnh thành'
    }
-});
+}, 'vi');
 ```
 <a id="setOptions"></a>
 
 ## setOptions(options)
 set options
- 
+  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -342,7 +322,12 @@ hmve.setOptions({
    default_package           : 'DEFAULT',
    msg_delimiter             : ', ',
    path_name_key             : '$name',
+   link_to_errors            : 'errors',
    link_to_origin_error      : false,
+   additional_error_fields   : {
+     error_name                : 'ValidationError',
+     error_code                : 'ERR_MONGOOSE_VALIDATION_ERROR',
+    },
    additional_context_fields : {
      // <context_key> : <schema_key>
    }

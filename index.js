@@ -9,7 +9,7 @@ const hmve                 = require('./hmve');
 
 hmve.setOptions(DEFAULT_OPTIONS);
 hmve.setErrorContexts(DEFAULT_ERR_CONTEXT);
-hmve.setTypeNames('DEFAULT', DEFAULT_TYPE_NAME);
-hmve.setMessageTemplates('DEFAULT', DEFAULT_MSG_TEMPLATE);
+hmve.setTypeNames(DEFAULT_TYPE_NAME);
+hmve.setMessageTemplates(DEFAULT_MSG_TEMPLATE);
 
 module.exports = hmve;
