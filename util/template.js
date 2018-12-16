@@ -1,7 +1,6 @@
 'use strict';
 
 const _   = require('lodash');
-const _is = require('./is');
 
 module.exports = {
   compile   : compile,

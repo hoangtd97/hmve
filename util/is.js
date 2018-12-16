@@ -1,6 +1,5 @@
 'use strict';
 
-const CONST    = require('../const');
 const _        = require('lodash');
 const parse    = require('./parse');
 

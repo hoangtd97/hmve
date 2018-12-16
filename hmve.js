@@ -8,13 +8,13 @@ const template = require('./util/template');
 module.exports                     = handleMongooseValidateError;
 module.exports.validate            = validateDocument;
 
-module.exports.setOptions          = setOptions;
+module.exports.config              = config;
 module.exports.setErrorContexts    = setErrorContexts;
 module.exports.setMessageTemplates = setMessageTemplates;
 module.exports.setTypeNames        = setTypeNames;
 module.exports.setPathNames        = setPathNames;
 
-module.exports.getOptions          = getOptions;
+module.exports.getConfig          = getConfig;
 module.exports.getErrorContexts    = getErrorContexts;
 module.exports.getMessageTemplates = getMessageTemplates;
 module.exports.getTypeNames        = getTypeNames;
@@ -24,7 +24,7 @@ const MSG_TEMPLATES = {}; // <pack>        : { <error_kind> : <message_template>
 const ERR_CONTEXTS  = {}; // <error_kind>  : { <field> : <value> }
 const TYPE_NAMES    = {}; // <pack>        : { <type> : <type_name> }
 const PATH_NAMES    = {}; // <model>       : { <pack> : { <path> : <name> } }
-const OPTIONS       = {};
+const CONFIG        = {};
 
 //------------------- EXECUTOR -------------------
 
@@ -34,6 +34,8 @@ const OPTIONS       = {};
  * @param {Object} model Mongoose model object or name
  * @param {Object} validationError Mongoose validation error
  * @param {Object} [options]
+ * 
+ * @description 
  * 
  * @return {Object} user-friendly error
  * 
@@ -91,17 +93,17 @@ function handleMongooseValidateError(model, validationError, options) {
   }
 
   let messages     = new_errors.map(new_error => new_error.message);
-  let message      = messages.join(OPTIONS.msg_delimiter);
+  let message      = messages.join(CONFIG.msg_delimiter);
 
   let error        = new Error(message);
   error.messages   = messages;
   error.model_name = model.modelName;
   error.options    = options;
 
-  _.merge(error, OPTIONS.additional_error_fields);
+  _.merge(error, CONFIG.additional_error_fields);
 
-  if (_is.filledString(OPTIONS.link_to_errors)) {
-    error[OPTIONS.link_to_errors] = new_errors;
+  if (_is.filledString(CONFIG.link_to_errors)) {
+    error[CONFIG.link_to_errors] = new_errors;
   }
 
   return error;
@@ -109,8 +111,8 @@ function handleMongooseValidateError(model, validationError, options) {
 
 function parseArguments(...args) {
   const HANDLER_OPTIONS = {
-    package       : OPTIONS.default_package,
-    exclude_error : []
+    package        : CONFIG.default_package,
+    exclude_errors : []
   };
 
   let [model, validationError, options] = args;
@@ -127,6 +129,9 @@ function parseArguments(...args) {
   }
  
   options = _.assign(HANDLER_OPTIONS, options);
+  if (_.isString(options.exclude_errors)) {
+    options.exclude_errors = [options.exclude_errors];
+  }
 
   return [model, validationError, options, error_type];
 }
@@ -181,10 +186,10 @@ function validateDocument(doc, options) {
 
 function generateLineError(model, line_error, options) {
   let err_context  = generateErrMsgContext(model, line_error, options.package);
-  if (options.exclude_error.includes(err_context.KIND)) {
+  if (options.exclude_errors.includes(err_context.KIND)) {
     return undefined;
   }
-  let msg_template = _.get(MSG_TEMPLATES[options.package], OPTIONS.default_key);
+  let msg_template = _.get(MSG_TEMPLATES[options.package], CONFIG.default_key);
   msg_template     = _.get(MSG_TEMPLATES[options.package], line_error.kind, msg_template);
   if (line_error.kind === 'user defined') {
     msg_template = line_error.message;
@@ -217,7 +222,7 @@ function generateErrMsgContext(model, err, pack) {
   }
 ``
   err.path_name   = err.path;
-  err.path_name   = _.get(schema.obj, [err.path, OPTIONS.path_name_key].join('.'), err.path_name);
+  err.path_name   = _.get(schema.obj, [err.path, CONFIG.path_name_key].join('.'), err.path_name);
   err.path_name   = _.get(PATH_NAMES, [model.modelName, pack, err.path].join('.'), err.path_name);
 
   let base_context    = _.cloneDeep(ERR_CONTEXTS.base);
@@ -233,7 +238,7 @@ function generateErrMsgContext(model, err, pack) {
   let context         = _.merge(base_context, kind_context);
 
   // additional context
-  _.forEach(OPTIONS.additional_context_fields, (context_field, schema_field) => {
+  _.forEach(CONFIG.additional_context_fields, (context_field, schema_field) => {
       context[context_field] = _.get(schema.obj, [context.path, schema_field].join('.'));
   });
 
@@ -269,7 +274,7 @@ function setMessageTemplates(messageTemplate, packageName) {
     throw new TypeError(`Param 'messageTemplate' expect a object, but received '${messageTemplate}'`);
   }
   if (!_is.filledString(packageName)) {
-    packageName = OPTIONS.default_package;
+    packageName = CONFIG.default_package;
   }
   MSG_TEMPLATES[packageName] = messageTemplate;
 }
@@ -321,7 +326,7 @@ function setTypeNames(typeNames, packageName) {
     throw new TypeError(`Param 'typeNames' expect a object, but received '${typeNames}'`);
   }
   if (!_is.filledString(packageName)) {
-    packageName = OPTIONS.default_package;
+    packageName = CONFIG.default_package;
   }
   TYPE_NAMES[packageName] = typeNames;
 }
@@ -358,22 +363,21 @@ function setPathNames(model, pathNames, packageName) {
     throw new TypeError(`Param 'pathNames' expect a object, but received '${pathNames}'`);
   }
   if (!_is.filledString(packageName)) {
-    packageName = OPTIONS.default_package;
+    packageName = CONFIG.default_package;
   }
   _.set(PATH_NAMES, [model_name, packageName], pathNames);
 }
 
 /**
- * set options
- * @param {Object} options options
+ * Config
+ * @param {Object} config config
  * @example
  * 
- * hmve.setOptions({
+ * hmve.config({
  *    default_package           : 'DEFAULT',
  *    msg_delimiter             : ', ',
  *    path_name_key             : '$name',
  *    link_to_errors            : 'errors',
- *    link_to_origin_error      : false,
  *    additional_error_fields   : {
  *      error_name                : 'ValidationError',
  *      error_code                : 'ERR_MONGOOSE_VALIDATION_ERROR',
@@ -383,12 +387,13 @@ function setPathNames(model, pathNames, packageName) {
  *    }
  * });
  */
-function setOptions(options) {
-  if (!_is.filledObject(options)) {
-    throw new TypeError(`Param 'options' expect a object, but received '${options}'`);
+function config(config) {
+  if (!_is.filledObject(config)) {
+    throw new TypeError(`Param 'config' expect a object, but received '${config}'`);
   }
-  _.merge(OPTIONS, options);
+  _.merge(CONFIG, config);
 }
+
 //------------------- GETTER ----------------------
 function getMessageTemplates(packageName) {
   if (_is.filledString(packageName)) {
@@ -429,6 +434,6 @@ function getPathNames(model, packageName) {
   return _.cloneDeep(PathNames);
 }
 
-function getOptions() {
-  return _.cloneDeep(OPTIONS);
+function getConfig() {
+  return _.cloneDeep(CONFIG);
 }

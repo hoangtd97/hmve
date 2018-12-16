@@ -53,7 +53,7 @@ hmve only handle mongoose validation error, other error type will be return dire
   user.validate(err => {
     err = hmve(UserModel, err);
     if (err) {
-      // use can change error code by use setOptions()
+      // use can change error code by use config()
       if (err.code === 'ERR_MONGOOSE_VALIDATION_ERROR') { 
         return res.status(401).json({ error : err.message });
       }
@@ -78,8 +78,8 @@ hmve only handle mongoose validation error, other error type will be return dire
   ```
 
 
-
-## List Error kind and their context variables  
+<a id="list-error-kinds"></a>
+## List error kinds and their context variables  
 Use this to write custom message templates
 
 | KIND | CONTEXT VARIABLE |
@@ -98,49 +98,49 @@ Use this to write custom message templates
 ## Error Object
 ```js
 {
-   "message" : "Birthday must be a date, Username is required, Full name must be at least 3 characters long",
-   "messages": [
+   "message"    : "Birthday must be a date, Username is required, Full name must be at least 3 characters long",
+   "messages"   : [
      "Birthday must be a date",
      "Username is required",
      "FullName must be at least 3 characters long"
-   ]
-   "name": "ValidationError",
-   "code": "ERR_MONGOOSE_VALIDATION_ERROR",
-   "model_name": "Users",
-   "pack": "DEFAULT",
-   "errors": [
+   ],
+   "name"       : "ValidationError",
+   "code"       : "ERR_MONGOOSE_VALIDATION_ERROR",
+   "model_name" : "Users",
+   "pack"       : "DEFAULT",
+   "errors"     : [
      {
-       "message": "Birthday must be a date",
-       "context": {
-         "KIND": "type",
-         "PATH_NAME": "birthday",
-         "PATH": "birthday",
-         "TYPE": "Date",
-         "TYPE_NAME": "date",
-         "VALUE": "is a date?",
-         "STRING_VALUE": "\"is a date?\""
+       "message"      : "Birthday must be a date",
+       "context"      : {
+         "KIND"         : "type",
+         "PATH_NAME"    : "birthday",
+         "PATH"         : "birthday",
+         "TYPE"         : "Date",
+         "TYPE_NAME"    : "date",
+         "VALUE"        : "is a date?",
+         "STRING_VALUE" : "\"is a date?\""
        },
-       "template": "{PATH_NAME} must be a {TYPE_NAME}"
+       "template"     : "{PATH_NAME} must be a {TYPE_NAME}"
      },
      {
-       "message": "Username is required",
-       "context": {
-         "KIND": "required",
-         "PATH_NAME": "username",
-         "PATH": "username"
+       "message"      : "Username is required",
+       "context"      : {
+         "KIND"         : "required",
+         "PATH_NAME"    : "username",
+         "PATH"         : "username"
        },
-       "template": "{PATH_NAME} is required"
+       "template"     : "{PATH_NAME} is required"
      },
      {
-       "message": "Full name must be at least 3 characters long",
-       "context": {
-         "KIND": "minlength",
-         "PATH_NAME": "full name",
-         "PATH": "fullName",
-         "VALUE": "Bi",
-         "MIN_LENGTH": 3
+       "message"      : "Full name must be at least 3 characters long",
+       "context"      : {
+         "KIND"         : "minlength",
+         "PATH_NAME"    : "full name",
+         "PATH"         : "fullName",
+         "VALUE"        : "Bi",
+         "MIN_LENGTH"   : 3
        },
-       "template": "{PATH_NAME} must be at least {MIN_LENGTH} characters long"
+       "template"     : "{PATH_NAME} must be at least {MIN_LENGTH} characters long"
      }
    ],
 }
@@ -150,18 +150,18 @@ Use this to write custom message templates
 
 | API | Description |
 | --- | --- |
-|<a href="#hmve">hmve(model, validationError, [pack])</a>|<p>Handle mongoose validation error</p>|
-|<a href="#validate">validate(doc, [pack])</a>|<p>Validate mongoose document, handle error with hmve</p>|
-|<a href="#setMessageTemplates">setMessageTemplates(packageName, messageTemplate)</a>|<p>Set message template for a package</p>|
-|<a href="#setTypeNames">setTypeNames(packageName, typeNames)</a>|<p>Set type names for a package</p>|
-|<a href="#setPathNames">setPathNames(model, packageName, pathNames)</a>|<p>Set path names for a package</p>|
-|<a href="#setOptions">setOptions(options)</a>|<p>set options</p>|
+|<a href="#hmve">hmve(model, validationError, [options])</a>|<p>Handle mongoose validation error</p>|
+|<a href="#validate">validate(doc, [options])</a>|<p>Validate mongoose document, handle error with hmve</p>|
+|<a href="#setMessageTemplates">setMessageTemplates(messageTemplate, [packageName])</a>|<p>Set message template for a package</p>|
+|<a href="#setTypeNames">setTypeNames(typeNames, [packageName])</a>|<p>Set type names for a package</p>|
+|<a href="#setPathNames">setPathNames(model, pathNames, [packageName])</a>|<p>Set path names for a package</p>|
+|<a href="#config">config(options)</a>|<p>Config</p>|
 
 # Handler
 <a id="hmve"></a>
 
 ## hmve(model, validationError, [options]) ⇒ <code>Object</code>
-Handle mongoose validation error
+Handle only [mongoose validation error](#list-error-kinds), other error type will be return directly.
   
 **Returns**: <code>Object</code> - user-friendly error  
 
@@ -169,7 +169,14 @@ Handle mongoose validation error
 | --- | --- | --- |
 | model | <code>Object</code> | Mongoose model object or name |
 | validationError | <code>Object</code> | Mongoose validation error |
-| [options] | <code>Object</code> |  |
+| [options] | <code>Object</code> |  [options](#hvme-options) |
+
+<a id="hvme-options"></a>
+### Options
+| field | Type | Description | Example |
+| --- | --- | --- | --- |
+| package | <code>String</code> | Language package name. Default is config.default_package. Must be provide in multi language mode. | 'vi', 'jp' |
+| exclude_errors | <code>String\|Array</code> | One or more error kinds will be excluded. Ex: exclude 'required' error when validating update data. | 'required', ['required, 'unique'] |
 
 **Example**  
 ```js
@@ -206,7 +213,7 @@ This just a convenience syntax with async/await.
 | Param | Type | Description |
 | --- | --- | --- |
 | doc | <code>Object</code> | mongoose document |
-| [options] | <code>Object</code> |  |
+| [options] | <code>Object</code> |  same as hmve() [options](#hvme-options)|
 
 **Example**  
 ```js
@@ -230,9 +237,9 @@ if (user_friendly_error) {
    res.status(401).json(user_friendly_error.message); 
 }
 ```
-<a id="setMessageTemplates"></a>
 
 # Setter
+<a id="setMessageTemplates"></a>
 
 ## setMessageTemplates(messageTemplate, [packageName])
 Set message template for a package
@@ -306,9 +313,9 @@ hmve.setPathNames('User', {
    }
 }, 'vi');
 ```
-<a id="setOptions"></a>
+<a id="config"></a>
 
-## setOptions(options)
+## config(options)
 set options
   
 
@@ -318,7 +325,7 @@ set options
 
 **Example**  
 ```js
-hmve.setOptions({
+hmve.config({
    default_package           : 'DEFAULT',
    msg_delimiter             : ', ',
    path_name_key             : '$name',
