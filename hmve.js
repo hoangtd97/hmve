@@ -58,7 +58,7 @@ const CONFIG        = {};
  * user.validate(err => {
  *   user_friendly_error = hmve(UsersModel, err);
  *   if (user_friendly_error) {
- *      res.status(401).json(user_friendly_error.message); 
+ *      res.status(400).json(user_friendly_error.message); 
  *   }
  * });
  * 
@@ -163,7 +163,7 @@ function parseArguments(...args) {
  * 
  * let user_friendly_error = await hmve.validate(user);
  * if (user_friendly_error) {
- *    res.status(401).json(user_friendly_error.message); 
+ *    res.status(400).json(user_friendly_error.message); 
  * }
  */
 function validateDocument(doc, options) {
@@ -194,8 +194,12 @@ function generateLineError(model, line_error, options) {
   if (line_error.kind === 'user defined') {
     msg_template = line_error.message;
   }
+  let message = template.compile(msg_template, err_context);
+  if (CONFIG.upper_first) {
+    message = _.upper_first(message);
+  }
   return {
-    message  : template.compile(msg_template, err_context),
+    message  : message,
     context  : err_context,
     template : msg_template
   }
@@ -378,6 +382,7 @@ function setPathNames(model, pathNames, packageName) {
  *    msg_delimiter             : ', ',
  *    path_name_key             : '$name',
  *    link_to_errors            : 'errors',
+ *    upper_first               : true,
  *    additional_error_fields   : {
  *      error_name                : 'ValidationError',
  *      error_code                : 'ERR_MONGOOSE_VALIDATION_ERROR',

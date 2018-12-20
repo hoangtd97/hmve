@@ -7,26 +7,42 @@ module.exports = {
   deCompile : deCompile
 };
 
+/**
+ * Compile string from string template with data
+ * @param {string} template string template, which contain variable in bracket {VAR}
+ * @param {object} data string data
+ * @return {string} compiled string
+ * @example
+ * compile('{PATH_NAME} must be a {TYPE}', { PATH_NAME : 'birthday', TYPE : 'date' });
+ * => 'birthday must be a date'
+ */
 function compile(template,  data) {
   let result = template.toString ? template.toString() : '';
   result = result.replace(/{.+?}/g, function(matcher){
     var path = matcher.slice(1, -1).trim();
     return _.get(data, path, '');
   });
-  if (result.length > 0) {
-    if (isLowerCase(result[0])) {
-      result = result[0].toUpperCase() + result.slice(1);
-    }
-  }
   return result;
 }
 
 /*
-template = 'E11000 duplicate key error collection: {COLLECTION} index: {INDEX} dup key: { : {VALUE} }';
-str      = 'E11000 duplicate key error collection: test.Users index: id_1 dup key: { : 1000 }';
-data_keys = ['COLLECTION', 'INDEX', 'VALUE'];
-data_values = ['test.Users', 'id_1', '1000'];
+  template = 'E11000 duplicate key error collection: {COLLECTION} index: {INDEX} dup key: { : {VALUE} }';
+  str      = 'E11000 duplicate key error collection: test.Users index: id_1 dup key: { : 1000 }';
+  data_keys = ['COLLECTION', 'INDEX', 'VALUE'];
+  data_values = ['test.Users', 'id_1', '1000'];
 */
+
+/**
+ * Decompile string to get string data
+ * @description Note that all data value is string
+ * @param {string} template string template, which contain variables in bracket {VAR}
+ * @param {string} str string
+ * @return {object} message data
+ * 
+ * @example 
+ * deCompile('{PATH_NAME} must be a {TYPE}', 'birthday must be a date');
+ * => { PATH_NAME : 'birthday', TYPE : 'date' }
+ */
 function deCompile(template, str) {
   let data   = {};
   let keys   = [];
@@ -60,9 +76,4 @@ function deCompile(template, str) {
   }
 
   return data;
-}
-
-
-function isLowerCase(char) {
-  return char >= 'a' && char <= 'z';
 }
