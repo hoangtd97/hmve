@@ -196,7 +196,7 @@ function generateLineError(model, line_error, options) {
   }
   let message = template.compile(msg_template, err_context);
   if (CONFIG.upper_first) {
-    message = _.upper_first(message);
+    message = _.upperFirst(message);
   }
   return {
     message  : message,
