@@ -75,6 +75,7 @@ function handleMongooseValidateError(model, validationError, options) {
   if (error_type === CONST.ERROR_TYPE.MULTI) {
     for (let path in validationError.errors) {
       let line_error            = validationError.errors[path];
+      line_error.path           = path;
       const new_line_error      = generateLineError(model, line_error, options);
       if (_is.filledObject(new_line_error)) {
         new_errors.push(new_line_error);
@@ -224,8 +225,9 @@ function generateErrMsgContext(model, err, pack) {
   if (err.kind === 'user defined') {
     err.kind = 'validate';
   }
-``
+
   err.path_name   = err.path;
+  err.path_name   = err.path_name.replace(/\.\d+\./, '.0.');
   err.path_name   = _.get(schema.obj, [err.path, CONFIG.path_name_key].join('.'), err.path_name);
   err.path_name   = _.get(PATH_NAMES, [model.modelName, pack, err.path].join('.'), err.path_name);
 
