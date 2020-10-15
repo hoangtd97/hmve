@@ -30,7 +30,7 @@ function parseUniqueIndexString(indexStr) {
   let direct = undefined;
   if (typeof indexStr === 'string' && indexStr.length > 1) {
     let postFixLength = 1;
-    let lastChar      = indexStr.charCodeAt(indexStr.length - 1);
+    let lastChar      = indexStr.charAt(indexStr.length - 1);
     if (lastChar >= '0' && lastChar <= '9') {
       direct = Number(lastChar);
       postFixLength++;
